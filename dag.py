@@ -1,20 +1,12 @@
-from datetime import datetime
-import os
+
+
+from datetime import datetime, timedelta
 from airflow.decorators import dag, task
-from botocore.exceptions import ClientError
 import pandas as pd
-import boto3
-import logging
-import json
 from newsapi import NewsApiClient
+from airflow.providers.amazon.aws.transfers.local_to_s3 import LocalFilesystemToS3Operator
 import requests
 import ast
-
-nd_api_key = os.getenv("NEWSDATA_API_KEY")
-na_api_key = os.getenv("NEWSAPI_API_KEY")
-
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 
 # Dags parameters
 default_args = {
@@ -31,8 +23,8 @@ def news_collectors():
     def merge_dataframes():
         def get_data_from_newsdata_api():
             params = {
-                "apiKey": nd_api_key,
-                "q": "pegasus",
+                "apiKey": "pub_276036b4c583f45f88de54dfb6e1cd240fb0b",
+                "q": "bitcoin",
                 "language": "en"
             }
 
@@ -45,25 +37,31 @@ def news_collectors():
                 return None
 
         def get_data_from_newsapi_api():
-            newsapi = NewsApiClient(api_key=na_api_key)
+            newsapi = NewsApiClient(api_key="f7480f77896f4fb58d6e7b2ba0172c04")
+
+            today = datetime.today().date()
+
+            days_ago = today - timedelta(days=28)
+
+            days_ago = days_ago.strftime('%Y-%m-%d')
 
             newsapi_articles = newsapi.get_everything(q='bitcoin',
-                                                      sources='bbc-news,the-verge',
-                                                      domains='bbc.co.uk,techcrunch.com',
-                                                      from_param='2023-07-14',
-                                                      language='en',
-                                                      sort_by='relevancy')
+                                            sources='bbc-news,the-verge',
+                                            domains='bbc.co.uk,techcrunch.com',
+                                            from_param=days_ago,
+                                            language='en',
+                                            sort_by='relevancy')
 
             return newsapi_articles
+
 
         na_df = pd.DataFrame(get_data_from_newsapi_api()["articles"])
         nd_df = pd.DataFrame(get_data_from_newsdata_api()["results"])
 
         # Transform into correct json and get the source only from newsApi
         def extract_name(row):
-            correct_json = row.replace("'", "\"")
-            data = json.loads(correct_json)
-            return data['name']
+            
+            return row['name']
 
         na_df["source"] = na_df["source"].apply(extract_name)
 
@@ -96,33 +94,22 @@ def news_collectors():
                                     on=['source', 'author', 'title', 'description', 'url', 'urlToImage', 'publishedAt',
                                         'content'], how='outer')
 
-        final_data_frame.to_csv('final_dataframe.csv')
         final_data_frame = final_data_frame.iloc[:, :-6]
 
-        return "final_dataframe"
+        final_data_frame.to_csv('final_dataframe.csv')
+        return 'final_dataframe.csv'    
 
-    @task
-    def upload_to_s3(file_name, bucket):
-        AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
-        AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+    upload_task = LocalFilesystemToS3Operator(
+        task_id="Upload-to-S3",
+        aws_conn_id='aws_connection',
+        filename='/home/iloreus/airflow/dags/newsproject/final_dataframe.csv',
+        dest_bucket='news-collectors',
+        dest_key=datetime.today().date().strftime('%Y/%m/%d') + '.csv'
+    )
 
-        # If S3 object_name was not specified, use file_name
+       
+    merge_dataframes() >> upload_task
 
-        object_name = datetime.today().date().strftime('%Y/%m/%d') + '.csv'
-
-        # Upload the file
-        s3_client = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY_ID, aws_secret_access_key=AWS_SECRET_ACCESS_KEY)
-        try:
-            response = s3_client.upload_file(file_name, bucket, object_name)
-        except ClientError as e:
-            logging.error(e)
-            return False
-        return True
-
-    final_df = merge_dataframes()
-    upload_task = upload_to_s3(final_df, "news-collectors")
-
-    final_df >> upload_task
 
 
 my_dag_instance = news_collectors()
