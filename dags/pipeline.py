@@ -1,20 +1,22 @@
 from datetime import datetime
 from airflow import DAG
-from airflow.operators.python_operator import PythonOperator
+from airflow.operators.papermill_operator import PapermillOperator
+from airflow.models import Variable
 
-def hello_world():
-    print("Hello, World!")
+path = Variable.get("DATA_PATH")
 
-dag = DAG(
-    'my_first_dag',
-    description='Mon premier DAG avec Airflow',
-    schedule_interval='0 0 * * *',
+date_now = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+with DAG(
+    'ETL_news_dag',
+    description='Pipeline,etl,news',
+    schedule_interval='* * * * *',
     start_date=datetime(2023, 8, 15),
     catchup=False
-)
-
-task_hello = PythonOperator(
-    task_id='hello_task',
-    python_callable=hello_world,
-    dag=dag
-)
+) as dag:
+    news_etl_task = PapermillOperator(
+        task_id='news_task_id',
+        input_nb=f"{path}extractNewsApi.ipynb",
+        output_nb=f"{path}newsOutput-{date_now}.ipynb",
+        dag=dag
+    )
+    news_etl_task
