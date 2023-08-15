@@ -9,7 +9,7 @@ date_now = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 with DAG(
     'ETL_news_dag',
     description='Pipeline,etl,news',
-    schedule_interval='* * * * *',
+    schedule_interval='3 * * *',
     start_date=datetime(2023, 8, 15),
     catchup=False
 ) as dag:
