@@ -1,4 +1,4 @@
 newsapi-python
 pandas
 apache-airflow
-'apache-airflow[amazon]'
+apache-airflow[amazon]
