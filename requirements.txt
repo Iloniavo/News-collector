@@ -1,4 +1,6 @@
-newsapi-python
-pandas
 apache-airflow
-apache-airflow[amazon]
+pandas
+boto3
+botocore
+newsapi-python
+dotenv
