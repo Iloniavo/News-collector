@@ -24,7 +24,7 @@ def news_collectors():
         def get_data_from_newsdata_api():
             params = {
                 "apiKey": "pub_276036b4c583f45f88de54dfb6e1cd240fb0b",
-                "q": "bitcoin",
+                "q": "tesla",
                 "language": "en"
             }
 
@@ -45,7 +45,7 @@ def news_collectors():
 
             days_ago = days_ago.strftime('%Y-%m-%d')
 
-            newsapi_articles = newsapi.get_everything(q='bitcoin',
+            newsapi_articles = newsapi.get_everything(q='tesla',
                                             sources='bbc-news,the-verge',
                                             domains='bbc.co.uk,techcrunch.com',
                                             from_param=days_ago,
@@ -76,6 +76,14 @@ def news_collectors():
                 return "Unknown"
 
         nd_df["creator"] = nd_df["creator"].apply(format_creator)
+                # Format news data pubDate into datetime
+        def format_nd_df_datetime(row):
+            timestamp = datetime.strptime(row, "%Y-%m-%d %H:%M:%S")   
+            timestamp_seconds = timestamp.timestamp()
+            dt = datetime.fromtimestamp(timestamp_seconds, tz=timezone.utc)
+            return dt.strftime("%Y-%m-%dT%H:%M:%SZ") 
+
+        nd_df["pubDate"] = nd_df["pubDate"].apply(format_nd_df_datetime)
 
         # Rename all columns for merging
         nd_df.rename(columns={
