@@ -1,6 +1,6 @@
 
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from airflow.decorators import dag, task
 import pandas as pd
 from newsapi import NewsApiClient

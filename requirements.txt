@@ -4,3 +4,5 @@ boto3
 botocore
 newsapi-python
 dotenv
+apache-airflow[amazon]
+
